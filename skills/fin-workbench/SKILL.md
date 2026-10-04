@@ -26,6 +26,8 @@ ERP 管"记进去"，本工作台管"记完之后为什么、怎么办、怎么�
 |---|---|
 | "导出来的余额表没法看/要筛选" | `fincore view-balance` → 科目余额筛选台账 HTML |
 | "这个月交了多少税、构成怎样" | `fincore view-tax` → 支付税费台账 HTML |
+| "我每个月都要填/做 X" | `skills/fin-scout`（判定重复劳动是否值得铸造） |
+| "这个动作我重复很多遍了/又搞一遍了" | `skills/fin-scout` → 达标后移交 `skills/fill-forge` |
 | "我每个月都要填 X 表，数据源是 Y" | `skills/fill-forge` → 铸造新的填写技能 |
 | "帮我填 X 台账/快报" | 对应已铸造技能（示例：`forged/stat-monthly-ledger`） |
 | "新家 ERP 的导出格式对不上" | 新建一份 mapping.yaml（照 `demo/mapping_jinDie.yaml` 抄结构），映射助手辅助生成草稿 |
