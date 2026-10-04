@@ -51,6 +51,7 @@ python3.12 -m venv .venv && .venv/bin/pip install -e .
 
 ```
 fincore（确定性内核）：mapping.yaml → 标准模型 → 锚点 → 视图
+skills/fin-scout（元技能·发现者）：识别重复劳动 → 判定 → 移交铸造
 skills/fill-forge（铸表技能）：源表×目标表 → 新的填写技能
 forged/*（铸出的技能）：stat-monthly-ledger（已通过回填考试）
 demo/（星澜虚构数据）：乱格式样本 + 台账模板 + 一键脚本
