@@ -1,0 +1,26 @@
+# 统计月度台账 · 目标映射配置
+# 经人工确认冻结（fill-forge 第三步）。改动任何一行都要重跑回填考试。
+version: 1
+name: 统计月度台账填写（虚构演示）
+source:
+  mapping: demo/mapping_jinDie.yaml   # 数据源侧映射：乱格式余额表 → 标准模型
+target:
+  template: demo/统计台账模板/统计月度台账_模板.xlsx
+  period_cell: B2
+  period_format: "{y}年{m:02d}月"       # --period 2025-09 → "2025年09月"
+  unit_scale: 0.0001                   # 标准模型（元）→ 台账（万元）
+rows:
+  - { label: 营业收入,   unit: 万元, cell: C5,  kind: direct,  code: "6001", field: period_credit }
+  - { label: 营业成本,   unit: 万元, cell: C6,  kind: direct,  code: "6401", field: period_debit }
+  - { label: 税金及附加, unit: 万元, cell: C7,  kind: direct,  code: "6403", field: period_debit }
+  - { label: 销售费用,   unit: 万元, cell: C8,  kind: direct,  code: "6601", field: period_debit }
+  - { label: 管理费用,   unit: 万元, cell: C9,  kind: direct,  code: "6602", field: period_debit }
+  - { label: 研发费用,   unit: 万元, cell: C10, kind: direct,  code: "6603", field: period_debit }
+  - { label: 财务费用,   unit: 万元, cell: C11, kind: direct,  code: "6604", field: period_debit }
+  - { label: 营业利润,   unit: 万元, cell: C12, kind: formula, formula: operating_profit }
+  - { label: 所得税费用（计提）, unit: 万元, cell: C13, kind: direct, code: "6801", field: period_debit }
+  - { label: 净利润,     unit: 万元, cell: C14, kind: formula, formula: net_profit }
+  - { label: 实缴税费合计（当月缴纳）, unit: 万元, cell: C15, kind: formula, formula: tax_paid }
+  - { label: 资产总额,   unit: 万元, cell: C16, kind: formula, formula: asset_total }
+  - { label: 负债合计,   unit: 万元, cell: C17, kind: formula, formula: liab_total }
+  - { label: 净资产,     unit: 万元, cell: C18, kind: formula, formula: equity_total }
