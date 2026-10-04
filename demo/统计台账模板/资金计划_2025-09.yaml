@@ -1,0 +1,43 @@
+company: 星澜科技有限公司
+period: 2025-09
+lines:
+- name: 客户回款-蓝湾置业
+  direction: 收
+  amount: 3200000.0
+  counterparty: 深圳蓝湾置业
+  due: '2025-09-12'
+- name: 客户回款-远洋咨询
+  direction: 收
+  amount: 1860000.0
+  counterparty: 远洋咨询
+  due: '2025-09-20'
+- name: 客户回款-云帆数据
+  direction: 收
+  amount: 980000.0
+  counterparty: 云帆数据
+  due: '2025-09-25'
+- name: 客户回款-恒润贸易
+  direction: 收
+  amount: 1200000.0
+  counterparty: 恒润贸易
+  due: '2025-09-28'
+- name: 支付货款-华创建材
+  direction: 付
+  amount: 1450000.0
+  counterparty: 华创建材
+  due: '2025-09-16'
+- name: 支付工资-9月
+  direction: 付
+  amount: 2280000.0
+  counterparty: ''
+  due: '2025-09-10'
+- name: 缴纳税费-9月
+  direction: 付
+  amount: 2207900.0
+  counterparty: 深圳市税务局
+  due: '2025-09-18'
+- name: 房租物业费-9月
+  direction: 付
+  amount: 350000.0
+  counterparty: 万象物业
+  due: '2025-09-05'

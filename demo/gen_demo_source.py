@@ -310,6 +310,78 @@ def write_ledger(path: Path, period: str | None, values: dict[str, float] | None
     wb.save(path)
 
 
+# ---------------------------------------------------------------------------
+# 银行流水 demo（虚构，招行网银导出风格）：8 笔计划相关 + 2 笔手续费（关键词桶）
+# + 2 笔故意未匹配（对账差异演示）。余额链连续，锚点应全绿。
+# ---------------------------------------------------------------------------
+BANK_TXS = [
+    # (日期 yyyymmdd, 摘要, 对方户名, 收入, 支出)
+    ("20250905", "房租物业费", "深圳市万象物业管理有限公司", 0.0, 350000.00),
+    ("20250908", "客户回款", "深圳蓝湾置业有限公司", 3200000.00, 0.0),
+    ("20250910", "代发工资", "深圳市星澜科技有限公司", 0.0, 2280000.00),
+    ("20250912", "客户回款", "蓝湾置业(天津)有限公司", 500000.00, 0.0),
+    ("20250913", "网银转账手续费", "招商银行", 0.0, 120.00),
+    ("20250915", "支付材料款", "华创建材集团有限公司", 0.0, 1450000.00),
+    ("20250915", "转账手续费", "招商银行", 0.0, 85.00),
+    ("20250918", "咨询费回款", "远洋咨询(深圳)有限公司", 1860000.00, 0.0),
+    ("20250918", "缴纳所得税", "国家税务总局深圳市税务局", 0.0, 2207900.00),
+    ("20250922", "客户回款", "云帆数据科技有限公司", 480000.00, 0.0),
+    ("20250924", "客户回款", "云帆数据科技有限公司", 500000.00, 0.0),
+    ("20250926", "报销款", "李文", 0.0, 86420.50),
+]
+BANK_PLAN = [
+    # (计划名, 方向, 金额, 对方, 期望日)。云帆=1:N 聚合演示；恒润=未执行计划演示
+    {"name": "客户回款-蓝湾置业", "direction": "收", "amount": 3200000.00, "counterparty": "深圳蓝湾置业", "due": "2025-09-12"},
+    {"name": "客户回款-远洋咨询", "direction": "收", "amount": 1860000.00, "counterparty": "远洋咨询", "due": "2025-09-20"},
+    {"name": "客户回款-云帆数据", "direction": "收", "amount": 980000.00, "counterparty": "云帆数据", "due": "2025-09-25"},
+    {"name": "客户回款-恒润贸易", "direction": "收", "amount": 1200000.00, "counterparty": "恒润贸易", "due": "2025-09-28"},
+    {"name": "支付货款-华创建材", "direction": "付", "amount": 1450000.00, "counterparty": "华创建材", "due": "2025-09-16"},
+    {"name": "支付工资-9月", "direction": "付", "amount": 2280000.00, "counterparty": "", "due": "2025-09-10"},
+    {"name": "缴纳税费-9月", "direction": "付", "amount": 2207900.00, "counterparty": "深圳市税务局", "due": "2025-09-18"},
+    {"name": "房租物业费-9月", "direction": "付", "amount": 350000.00, "counterparty": "万象物业", "due": "2025-09-05"},
+]
+
+
+def write_messy_bank_export(path: Path) -> None:
+    """写"乱格式"招行网银风格流水导出。"""
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "账户交易明细"
+    ws["A1"] = "招商银行　交易明细（虚构示例数据）"
+    ws["A2"] = "账户：7559 **** **** 001　币种：人民币　20250901-20250930"
+    bold = Font(bold=True)
+    for col, h in enumerate(["\u3000交易日期\u3000", "\u3000摘要\u3000", "\u3000对方户名\u3000", "币种",
+                             "\u3000收入/贷方\u3000", "\u3000支出/借方\u3000", "\u3000余额\u3000"], 1):
+        ws.cell(row=3, column=col, value=h).font = bold
+    balance = 68_000_000.00
+    r = 4
+    for d, summary, cp, income, expense in BANK_TXS:
+        balance = round(balance + income - expense, 2)
+        ws.cell(row=r, column=1, value=d)  # 字符串日期（yymmdd 解析场景）
+        ws.cell(row=r, column=2, value=summary)
+        ws.cell(row=r, column=3, value=cp)
+        ws.cell(row=r, column=4, value="人民币")
+        ws.cell(row=r, column=5, value=income if income else None)
+        ws.cell(row=r, column=6, value=expense if expense else None)
+        ws.cell(row=r, column=7, value=balance)
+        r += 1
+    ws.cell(row=r, column=1, value="合计")
+    ws.cell(row=r + 1, column=1, value="打印时间：2025-10-01　招银示例导出")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    wb.save(path)
+
+
+def write_bank_plan(path: Path) -> None:
+    import yaml
+
+    OUT_TEMPLATE.mkdir(parents=True, exist_ok=True)
+    path.write_text(yaml.safe_dump({
+        "company": "星澜科技有限公司",
+        "period": "2025-09",
+        "lines": BANK_PLAN,
+    }, allow_unicode=True, sort_keys=False), encoding="utf-8")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--starlan", default=DEFAULT_STARLAN)
@@ -325,6 +397,10 @@ def main() -> None:
             write_ledger(OUT_TEMPLATE / "统计月度台账_2025-08_人工版.xlsx",
                          period="2025年08月", values=truth, with_notes=True)
             print("[gen] 台账模板 + 2025-08 人工版（回填考试答案）已生成")
+
+    write_messy_bank_export(OUT_EXPORT / "银行流水_2025-09_乱格式.xlsx")
+    write_bank_plan(OUT_TEMPLATE / "资金计划_2025-09.yaml")
+    print("[gen] 银行流水 demo（12 笔，含 2 笔故意未匹配）+ 资金计划（8 行）已生成")
     print(f"[gen] 完成 {datetime.now():%Y-%m-%d %H:%M}")
 
 

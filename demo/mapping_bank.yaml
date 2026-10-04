@@ -1,0 +1,30 @@
+# 银行流水映射配置示例：招商银行网银导出风格（乱格式演示）
+version: 1
+name: 招商银行网银导出示例（乱格式演示）
+source:
+  file: 示例导出/银行流水_2025-09_乱格式.xlsx   # 可被 CLI --bank-file 覆盖
+  sheet: 账户交易明细
+  header_row: 3
+  skip_patterns:            # A 列命中即跳过
+    - 合计
+    - 打印
+  date_formats:             # 网银常见 yyyymmdd 字符串日期
+    - "%Y%m%d"
+    - "%Y-%m-%d"
+    - "%Y/%m/%d"
+columns:
+  date: { col: A }
+  summary: { col: B }
+  counterparty: { col: C }
+  income: { col: E }        # 收入/贷方列
+  expense: { col: F }       # 支出/借方列（与 income 二选一，或用 signed_amount）
+  balance: { col: G }       # 有余额列时启用"余额链"锚点
+anchors:
+  - dates_parsed            # 日期全部可解析
+  - amounts_positive        # 金额恒为正
+  - balance_chain           # 余额链连续：上笔余额±本笔金额=本笔余额
+# 关键词聚合桶：不进资金计划的固定项目（匹配剩余流水，按桶汇总）
+special_rules:
+  - name: 银行手续费
+    direction: 付
+    match_any: ["手续费", "年费"]
