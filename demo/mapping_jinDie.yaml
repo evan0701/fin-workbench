@@ -1,0 +1,30 @@
+# 映射配置示例：金蝶云星空风格的"乱格式"科目余额表
+# 这是整个体系的"协议"文件 —— 用户只需描述自己家导出文件的样子，
+# 引擎负责把它变成标准模型。换软件/换格式，只换这个文件。
+version: 1
+name: 金蝶云星空示例（乱格式演示）
+source:
+  file: 示例导出/科目余额表_2025-09_乱格式.xlsx   # 可被 CLI --file 覆盖
+  sheet: 总账科目余额表
+  header_row: 4                # 前 3 行是公司名/标题/空行
+  skip_patterns:               # 命中 A 列这些字样的行直接跳过（合计/表尾）
+    - 合计
+    - 制表
+  company: 星澜科技有限公司
+  period: 2025-09
+unit_scale: 1.0                # 导出单位就是元，不做缩放
+unit_note: 元
+columns:
+  # 编码与名称挤在 A 列，用全角空格分隔
+  code_name:
+    col: A
+    split_regex: '^(\d+)\s+(.+)$'
+  opening: { debit: B, credit: C }
+  period:  { debit: D, credit: E }
+  closing: { debit: F, credit: G }
+  # H 列"备注"未映射，引擎自动忽略
+anchors:
+  - opening_balance            # 期初借方合计 = 期初贷方合计
+  - closing_balance            # 期末借方合计 = 期末贷方合计
+  - codes_unique               # 科目编码无重复、无空值
+  - carry_forward              # 本月期初 = 上月期末（需 --prev 提供上月模型）
