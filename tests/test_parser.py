@@ -114,3 +114,45 @@ def test_load_mapping_missing_section():
         path = f.name
     with pytest.raises(ValueError, match="columns"):
         load_mapping(path)
+
+
+def test_level_widths_mapping(tmp_path):
+    """真实账套驱动的特性：3 位分段编码（4/7/10 位）按 mapping 配置定级。"""
+    xlsx = tmp_path / "w.xlsx"
+    make_workbook(xlsx)
+    wb = openpyxl.load_workbook(xlsx)
+    ws = wb.active
+    ws.cell(row=4, column=1, value="1002001\u3000银行存款_工行")
+    wb.save(xlsx)
+    mapping = {**MAPPING, "level_widths": [4, 7, 10]}
+    model, _ = parse(mapping, xlsx)
+    assert model.by_code("1001").level == 1
+    assert model.by_code("1002001").level == 2
+    assert model.by_code("2202").level == 1
+
+
+def test_leaf_only_deduplicates_levels(tmp_path):
+    """真实账套驱动的特性：金蝶导出各级科目都带全额，leaf_only 只保留末级。"""
+    xlsx = tmp_path / "leaf.xlsx"
+    make_workbook(xlsx)
+    wb = openpyxl.load_workbook(xlsx)
+    ws = wb.active
+    # 1002 一级行 + 1002001 末级行，展示同一笔余额（金蝶风格逐级重复）
+    ws.cell(row=7, column=1, value="1002\u3000银行存款")
+    for col, v in ((2, 500.0), (3, 0), (4, 0), (5, 0), (6, 800.0), (7, 0)):
+        ws.cell(row=7, column=col, value=v)
+    ws.cell(row=8, column=1, value="1002001\u3000银行存款_工行")
+    for col, v in ((2, 500.0), (3, 0), (4, 0), (5, 0), (6, 800.0), (7, 0)):
+        ws.cell(row=8, column=col, value=v)
+    wb.save(xlsx)
+
+    mapping = {**MAPPING, "anchors": ["opening_balance", "closing_balance", "codes_unique"]}
+    full, a_full = parse(mapping, xlsx)
+    assert any(r.code == "1002" for r in full.rows) and any(r.code == "1002001" for r in full.rows)
+
+    leaf, a_leaf = parse({**MAPPING, "leaf_only": True}, xlsx)
+    codes = [r.code for r in leaf.rows]
+    assert "1002001" in codes and "1002" not in codes  # 只留末级
+    assert all(a.status == "PASS" for a in a_leaf)
+    # 金额不重复计算：末级 1002001 的期末 = 800
+    assert leaf.by_code("1002001").closing_debit == 800.0

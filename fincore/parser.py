@@ -60,8 +60,18 @@ def _parse_code_name(text: str, split_regex: str | None) -> tuple[str, str]:
     return groups[0].strip(), (groups[1].strip() if len(groups) > 1 else "")
 
 
-def _level_of(code: str) -> int:
-    """科目级次按编码段推断：4位=1级，6位=2级，8位=3级（如 222101 应交税费-应交增值税）。"""
+def _level_of(code: str, widths: list[int] | None = None) -> int:
+    """科目级次推断。
+
+    默认按 2 位分段（4位=1级，6位=2级，8位=3级）。部分账套用 3 位分段
+    （4/7/10 位），在 mapping 里配 level_widths: [4, 7, 10] 覆盖；
+    编码长度不在 widths 里时退回默认规则。
+    """
+    if widths:
+        try:
+            return widths.index(len(code)) + 1
+        except ValueError:
+            pass
     return max(1, len(code) // 2 - 1)
 
 
@@ -73,6 +83,7 @@ def parse(mapping: dict, source_file: str | Path, prev_model: StandardTB | None 
     header_row = int(src_cfg.get("header_row", 1))
     skip_patterns = [re.compile(p) for p in src_cfg.get("skip_patterns", ["合计", "制表"])]
     unit_scale = float(mapping.get("unit_scale", 1.0))
+    level_widths = mapping.get("level_widths")
 
     cols = mapping["columns"]
     code_name_cfg = cols.get("code_name")
@@ -114,7 +125,7 @@ def parse(mapping: dict, source_file: str | Path, prev_model: StandardTB | None 
             TBRow(
                 code=code,
                 name=name,
-                level=_level_of(code),
+                level=_level_of(code, level_widths),
                 opening_debit=get("opening", "debit"),
                 opening_credit=get("opening", "credit"),
                 period_debit=get("period", "debit"),
@@ -129,6 +140,14 @@ def parse(mapping: dict, source_file: str | Path, prev_model: StandardTB | None 
     if not rows:
         raise ValueError(f"没解析到任何科目行，请检查 mapping 的 header_row({header_row}) 和列配置: {source_file}")
 
+    if mapping.get("leaf_only"):
+        # 金蝶等导出会把一级/二级/末级科目的全额逐级重复展示，全量读取会双重计算。
+        # leaf_only 只保留"编码不是任何其他编码前缀"的末级科目行。
+        codes = [r.code for r in rows]
+        rows = [r for r in rows if not any(o != r.code and o.startswith(r.code) for o in codes)]
+        if not rows:
+            raise ValueError("leaf_only 过滤后没有剩余科目行，请检查编码列是否正确")
+
     meta = {
         "source_file": Path(source_file).name,
         "sheet": sheet_used,
@@ -137,6 +156,7 @@ def parse(mapping: dict, source_file: str | Path, prev_model: StandardTB | None 
         "unit": mapping.get("unit_note", "元"),
         "mapping_name": mapping.get("name", ""),
         "mapping_version": mapping.get("version", 1),
+        "leaf_only": bool(mapping.get("leaf_only")),
         "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
     }
     model = StandardTB(meta=meta, rows=rows)
