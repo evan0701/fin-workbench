@@ -122,7 +122,7 @@ def test_level_widths_mapping(tmp_path):
     make_workbook(xlsx)
     wb = openpyxl.load_workbook(xlsx)
     ws = wb.active
-    ws.cell(row=4, column=1, value="1002001\u3000银行存款_工行")
+    ws.cell(row=8, column=1, value="1002001\u3000银行存款_工行")  # 覆盖表尾"制表"行，金额全空
     wb.save(xlsx)
     mapping = {**MAPPING, "level_widths": [4, 7, 10]}
     model, _ = parse(mapping, xlsx)
@@ -137,22 +137,23 @@ def test_leaf_only_deduplicates_levels(tmp_path):
     make_workbook(xlsx)
     wb = openpyxl.load_workbook(xlsx)
     ws = wb.active
-    # 1002 一级行 + 1002001 末级行，展示同一笔余额（金蝶风格逐级重复）
+    ws.cell(row=5, column=7, value=950.0)  # 2202 期末贷方 150 → 950，给末级资产留对应贷方
+    # 1002 一级行（原"合计"行位置）+ 1002001 末级行（原"制表"行位置），金蝶风格展示同一笔余额
     ws.cell(row=7, column=1, value="1002\u3000银行存款")
-    for col, v in ((2, 500.0), (3, 0), (4, 0), (5, 0), (6, 800.0), (7, 0)):
+    for col, v in ((2, 0), (3, 0), (4, 0), (5, 0), (6, 800.0), (7, 0)):
         ws.cell(row=7, column=col, value=v)
     ws.cell(row=8, column=1, value="1002001\u3000银行存款_工行")
-    for col, v in ((2, 500.0), (3, 0), (4, 0), (5, 0), (6, 800.0), (7, 0)):
+    for col, v in ((2, 0), (3, 0), (4, 0), (5, 0), (6, 800.0), (7, 0)):
         ws.cell(row=8, column=col, value=v)
     wb.save(xlsx)
 
     mapping = {**MAPPING, "anchors": ["opening_balance", "closing_balance", "codes_unique"]}
-    full, a_full = parse(mapping, xlsx)
+    full, _ = parse(mapping, xlsx)
     assert any(r.code == "1002" for r in full.rows) and any(r.code == "1002001" for r in full.rows)
 
     leaf, a_leaf = parse({**MAPPING, "leaf_only": True}, xlsx)
     codes = [r.code for r in leaf.rows]
     assert "1002001" in codes and "1002" not in codes  # 只留末级
-    assert all(a.status == "PASS" for a in a_leaf)
-    # 金额不重复计算：末级 1002001 的期末 = 800
+    assert all(a.status == "PASS" for a in a_leaf), [(a.name, a.status, a.detail) for a in a_leaf]
+    # 金额不重复计算：末级 1002001 的期末 = 800（若父子重复计入会翻倍并破坏平衡）
     assert leaf.by_code("1002001").closing_debit == 800.0
