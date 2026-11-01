@@ -59,14 +59,28 @@ def anchor_badges(results) -> str:
 
 
 def kpi_cards(items: list[dict]) -> str:
-    """KPI 指标卡行。items: [{label, value, caption?, tone?}]，tone: good/bad/neutral。"""
+    """KPI 指标卡行。
+
+    items: [{label, value | value_yuan, caption | caption_html?, tone?}]
+    - value_yuan（元）给定时渲染为可随全局单位切换的数字 + 单位后缀
+    - caption_html 用于caption里也要跟随单位切换的场景（内嵌 v-num/v-unit）
+    """
     cards = []
     for it in items:
         tone = f' {it["tone"]}' if it.get("tone") else ""
-        cap = f'<div class="kpi-cap">{escape(it["caption"])}</div>' if it.get("caption") else ""
+        if "value_yuan" in it:
+            v = float(it["value_yuan"])
+            value_html = (f'<span class="v-num" data-v="{v:.2f}">{fmt(v)}</span>'
+                          f' <span class="v-unit">万元</span>')
+        elif "value_html" in it:
+            value_html = it["value_html"]
+        else:
+            value_html = escape(it["value"])
+        cap = f'<div class="kpi-cap">{it["caption_html"] if it.get("caption_html") else escape(it.get("caption", ""))}</div>' \
+            if (it.get("caption") or it.get("caption_html")) else ""
         cards.append(
             f'<div class="kpi{tone}"><div class="kpi-label">{escape(it["label"])}</div>'
-            f'<div class="kpi-value">{escape(it["value"])}</div>{cap}</div>'
+            f'<div class="kpi-value">{value_html}</div>{cap}</div>'
         )
     return f'<div class="kpis">{"".join(cards)}</div>'
 
@@ -131,6 +145,35 @@ h2::before { content:""; width:4px; height:14px; border-radius:2px; background:v
 .btn:hover { border-color:var(--accent); color:var(--accent); }
 .rowcount { font-size:12px; color:var(--muted); margin-left:auto; }
 .unit-tag { color:var(--accent); font-weight:600; }
+.pname { border:1px solid var(--line); border-radius:8px; padding:6px 10px; font-size:12.5px; width:170px; }
+.preset-chip { display:inline-flex; align-items:center; gap:4px; }
+.preset-chip .x { cursor:pointer; opacity:.55; font-size:11px; padding:0 2px; }
+.preset-chip .x:hover { opacity:1; }
+
+/* ---- Excel 式表头筛选 ---- */
+th .fbtn { border:none; background:none; cursor:pointer; font-size:10px; color:#9aa7bd;
+           padding:0 1px 0 5px; vertical-align:middle; }
+th .fbtn:hover { color:var(--accent); }
+th .fbtn.on { color:var(--accent); font-weight:700; }
+.fdrop { position:absolute; z-index:40; background:#fff; border:1px solid var(--line); border-radius:10px;
+         box-shadow:0 10px 28px rgba(15,28,51,.16); padding:10px; width:240px; max-height:340px;
+         overflow:auto; font-size:12.5px; }
+.fdrop .fsearch { width:100%; border:1px solid var(--line); border-radius:6px; padding:5px 8px;
+                  font-size:12px; margin-bottom:6px; outline:none; }
+.fdrop .fsearch:focus { border-color:var(--accent); }
+.fdrop .flist { max-height:170px; overflow:auto; border:1px solid var(--line); border-radius:6px; padding:4px 6px; }
+.fdrop .flist label { display:flex; gap:6px; align-items:center; padding:3px 2px; cursor:pointer; }
+.fdrop .flist .cnt { color:var(--muted); font-size:11px; margin-left:auto; }
+.fdrop .fnum { display:flex; flex-direction:column; gap:6px; }
+.fdrop .fnum .oprow { display:flex; gap:6px; align-items:center; }
+.fdrop select, .fdrop input[type="number"] { border:1px solid var(--line); border-radius:6px;
+        padding:4px 6px; font-size:12px; background:#fff; }
+.fdrop input[type="number"] { width:100px; }
+.fdrop .factions { display:flex; gap:6px; margin-top:8px; justify-content:space-between; align-items:center; }
+.fdrop .mini { border:1px solid var(--line); background:#fff; border-radius:6px; padding:3px 10px;
+               font-size:11.5px; cursor:pointer; color:var(--muted); }
+.fdrop .mini:hover { border-color:var(--accent); color:var(--accent); }
+.fdrop .hint { color:var(--muted); font-size:11px; }
 
 /* ---- 表格 ---- */
 table { border-collapse:separate; border-spacing:0; width:100%; background:#fff; }
@@ -182,8 +225,13 @@ function toggleUnit(btn){
     var v = parseFloat(td.dataset.v);
     td.childNodes[0].textContent = unitWan ? _fmtW(v) : _fmtY(v);
   });
+  document.querySelectorAll('.v-num').forEach(function(e){
+    var v = parseFloat(e.dataset.v);
+    e.textContent = unitWan ? _fmtW(v) : _fmtY(v);
+  });
+  document.querySelectorAll('.v-unit').forEach(function(e){ e.textContent = unitWan ? '万元' : '元'; });
   document.querySelectorAll('.unit-tag').forEach(function(e){ e.textContent = unitWan ? '万元' : '元'; });
-  if (btn) btn.textContent = unitWan ? '切换单位' : '切换单位';
+  if (btn) btn.textContent = '切换单位';
 }
 function sortTable(th){
   var table = th.closest('table'), tbody = table.querySelector('tbody');

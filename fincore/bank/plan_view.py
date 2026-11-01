@@ -40,13 +40,13 @@ def render_plan_ledger(report: MatchReport, anchors: list[dict] | None = None,
     bucket_total = sum(b.matched_amount for b in report.keyword_buckets)
 
     kpis = kpi_cards([
-        {"label": "计划总额", "value": f"{planned_total / 1e4:,.2f} 万元",
+        {"label": "计划总额", "value_yuan": planned_total,
          "caption": f"{len(report.matches) + len(report.unmatched_plans)} 行计划"},
-        {"label": "已匹配", "value": f"{matched_total / 1e4:,.2f} 万元", "tone": "good"},
+        {"label": "已匹配", "value_yuan": matched_total, "tone": "good"},
         {"label": "总体执行率", "value": f"{overall:.0f}%", "tone": "good" if overall >= 80 else ("bad" if overall < 50 else "neutral")},
-        {"label": "未匹配流水", "value": f"{tx_total / 1e4:,.2f} 万元",
+        {"label": "未匹配流水", "value_yuan": tx_total,
          "caption": f"{len(report.unmatched_txs)} 笔（银行有、计划无）", "tone": "bad" if tx_total else "neutral"},
-        {"label": "未执行计划", "value": f"{plan_total / 1e4:,.2f} 万元",
+        {"label": "未执行计划", "value_yuan": plan_total,
          "caption": f"{len(report.unmatched_plans)} 行（计划有、银行无）", "tone": "bad" if plan_total else "neutral"},
     ])
 
@@ -102,7 +102,11 @@ def render_plan_ledger(report: MatchReport, anchors: list[dict] | None = None,
   {kpis}
   <div class="card">
     <h2>计划执行情况</h2>
-    <div class="toolbar"><input id="f-q" type="search" placeholder="搜索计划名或对方…"></div>
+    <div class="toolbar">
+      <input id="f-q" type="search" placeholder="搜索计划名或对方…">
+      <button class="btn" onclick="toggleUnit(this)">切换单位</button>
+      <button class="btn" onclick="window.print()">打印 / 导出 PDF</button>
+    </div>
     <table>
       <thead><tr><th>计划项目</th><th>方向</th><th>计划金额</th><th>已匹配金额</th><th>执行率</th><th>匹配明细</th><th>命中规则</th></tr></thead>
       <tbody id="main-tbody">{''.join(rows_html) or '<tr><td colspan="7">无计划行</td></tr>'}</tbody>

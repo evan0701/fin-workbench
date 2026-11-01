@@ -64,8 +64,9 @@ def render_tax_ledger(models: list[StandardTB], tax_root: str = "2221") -> str:
 
     kpis = kpi_cards(
         [
-            {"label": f"实缴合计 · {period_of(m)}", "value": f"{month_paid[id(m)] / 1e4:,.2f} 万元",
-             "caption": f"期末未缴 {month_unpaid[id(m)] / 1e4:,.2f} 万元",
+            {"label": f"实缴合计 · {period_of(m)}", "value_yuan": month_paid[id(m)],
+             "caption_html": (f'期末未缴 <span class="v-num" data-v="{month_unpaid[id(m)]:.2f}">'
+                              f'{fmt(month_unpaid[id(m)])}</span> <span class="v-unit">万元</span>'),
              "tone": "good" if month_paid[id(m)] > 0 else "neutral"}
             for m in models
         ]
@@ -98,6 +99,11 @@ def render_tax_ledger(models: list[StandardTB], tax_root: str = "2221") -> str:
     body = f"""
   {kpis}
   <div class="card">
+    <div class="toolbar">
+      <button class="btn" onclick="toggleUnit(this)">切换单位</button>
+      <button class="btn" onclick="window.print()">打印 / 导出 PDF</button>
+      <span class="rowcount">KPI 卡与明细同步切换</span>
+    </div>
     <table>
       <thead><tr>
         <th>科目</th><th>税费种类</th>
