@@ -93,6 +93,10 @@ def parse(mapping: dict, source_file: str | Path, prev_model: StandardTB | None 
     opening_cfg, period_cfg, closing_cfg = cols["opening"], cols["period"], cols["closing"]
 
     wb = load_workbook(source_file, read_only=True, data_only=True)
+    if sheet_name and sheet_name not in wb.sheetnames:
+        available = "、".join(repr(s) for s in wb.sheetnames[:10])
+        wb.close()
+        raise ValueError(f"工作表 {sheet_name!r} 不存在。文件里可用的工作表: {available}。请修改 mapping 的 source.sheet")
     ws = wb[sheet_name] if sheet_name else wb[wb.sheetnames[0]]
     sheet_used = ws.title
 
@@ -110,7 +114,10 @@ def parse(mapping: dict, source_file: str | Path, prev_model: StandardTB | None 
 
         if code_name_cfg is not None:
             raw_text = str(first).replace("\u3000", " ").strip()
-            code, name = _parse_code_name(raw_text, split_regex)
+            try:
+                code, name = _parse_code_name(raw_text, split_regex)
+            except ValueError:
+                continue  # 非科目行（节标题/报表行等）跳过；全部被跳过时由空结果诊断兜底说明原因
         else:
             code = str(cells[_col_idx(code_cfg["col"]) - 1]).strip()
             name = str(cells[_col_idx(name_cfg["col"]) - 1]).strip() if name_cfg else ""
@@ -135,10 +142,29 @@ def parse(mapping: dict, source_file: str | Path, prev_model: StandardTB | None 
                 src={"file": Path(source_file).name, "sheet": sheet_used, "row": row_no},
             )
         )
-    wb.close()
-
     if not rows:
-        raise ValueError(f"没解析到任何科目行，请检查 mapping 的 header_row({header_row}) 和列配置: {source_file}")
+        # 诊断信息：告诉用户文件里到底有什么，而不是只让他"检查配置"
+        samples: list[str] = []
+        scanned = 0
+        for row in ws.iter_rows(min_row=header_row + 1, max_col=1, values_only=True):
+            v = row[0]
+            if v is None or not str(v).strip():
+                continue
+            scanned += 1
+            if len(samples) < 5:
+                samples.append(str(v).strip()[:20])
+        wb.close()
+        hint = ""
+        if samples and not any(re.match(r"^\d+(\.\d+)*$", s) for s in samples):
+            hint = ("；首列样例均不是纯数字编码，这份文件可能是报表格式（资产负债表/利润表等按行列展开的报表），"
+                    "不是科目余额表导出，无法用科目余额 mapping 转换——余额表导出的首列应为科目编码")
+        raise ValueError(
+            f"没解析到任何科目行: {source_file} / 工作表 {sheet_used!r}。"
+            f"header_row={header_row} 之后共扫描到 {scanned} 个非空首行，样例: {samples}。"
+            f"请检查 mapping 的 header_row 与 columns 配置{hint}"
+        )
+
+    wb.close()
 
     if mapping.get("leaf_only"):
         # 金蝶等导出会把一级/二级/末级科目的全额逐级重复展示，全量读取会双重计算。

@@ -70,14 +70,19 @@ def test_parse_skips_junk_and_splits_code_name(tmp_path):
     assert all(a.status == "PASS" for a in anchors)
 
 
-def test_parse_rejects_unsplittable_code(tmp_path):
+def test_parse_skips_unsplittable_rows(tmp_path):
+    """非科目行（节标题/报表行）跳过不硬报错；数据被破坏由锚点兜底（这里节标题
+    覆盖了 1001 行导致余额失平，opening/closing 锚点应当 FAIL——完整性保护生效）。"""
     xlsx = tmp_path / "bad.xlsx"
     make_workbook(xlsx)
     wb = openpyxl.load_workbook(xlsx)
-    wb.active["A4"] = "这不是科目"
+    wb.active["A4"] = "一、流动资产："   # 节标题行，非科目
     wb.save(xlsx)
-    with pytest.raises(ValueError, match="split_regex"):
-        parse(MAPPING, xlsx)
+    model, anchors = parse(MAPPING, xlsx)
+    assert [r.code for r in model.rows] == ["2202", "6001"]
+    by_name = {a.name: a.status for a in anchors}
+    assert by_name["codes_unique"] == "PASS"
+    assert by_name["opening_balance"] == "FAIL"   # 1001 被顶掉，贷方单边 —— 锚点如实拦截
 
 
 def test_anchor_closing_balance_failure():
@@ -104,6 +109,32 @@ def test_carry_forward_anchor(tmp_path):
     assert ok.status == "PASS"
     assert bad.status == "FAIL" and "140.00" in bad.detail
     assert skip.status == "SKIPPED"
+
+
+def test_parse_missing_sheet_friendly(tmp_path):
+    """工作表名写错时给可读报错并列出可用工作表，不甩 openpyxl 原始堆栈。"""
+    xlsx = tmp_path / "s.xlsx"
+    make_workbook(xlsx)
+    bad = {**MAPPING, "source": {**MAPPING["source"], "sheet": "不存在的表"}}
+    with pytest.raises(ValueError, match="工作表.*不存在.*总账"):
+        parse(bad, xlsx)
+
+
+def test_parse_report_format_file_diagnosis(tmp_path):
+    """拿报表格式文件（首列是月份，非科目编码）接入时，报错要指出样例值并提示格式不符。"""
+    import openpyxl as ox
+
+    xlsx = tmp_path / "report.xlsx"
+    wb = ox.Workbook()
+    ws = wb.active
+    ws.title = "总账"
+    ws["A3"] = "月份"
+    for i, m in enumerate(["2024-01", "2024-02", "2024-03"], start=4):
+        ws.cell(row=i, column=1, value=m)
+        ws.cell(row=i, column=2, value=1000 + i)
+    wb.save(xlsx)
+    with pytest.raises(ValueError, match="报表格式"):
+        parse(MAPPING, xlsx)
 
 
 def test_load_mapping_missing_section():
